@@ -5,12 +5,16 @@
       <div class="header-content">
         <!-- logo -->
         <router-link to="/" class="logo">PreTeXt</router-link>
+
         <!-- 导航菜单 -->
         <nav>
-          <router-link to="/">首页</router-link>
-          <router-link to="/examples">示例</router-link>
-          <router-link to="/documentation">文档</router-link>
+          <router-link to="/">{{ $t('nav.home') }}</router-link>
+          <router-link to="/examples">{{ $t('nav.examples') }}</router-link>
+          <router-link to="/documentation">{{ $t('nav.documentation') }}</router-link>
         </nav>
+
+        <!-- 语言切换器 -->
+        <LocaleSwitcher />
       </div>
     </header>
 
@@ -19,7 +23,7 @@
     </main>
 
     <footer class="app-footer">
-      <p>PreTeXt 演示项目 &copy; 2026</p>
+      <p>{{ $t('messages.welcome') }} PreTeXt 演示项目 &copy; 2026</p>
     </footer>
   </div>
 </template>
@@ -121,3 +125,14 @@ nav a:hover {
   }
 }
 </style>
+
+<script>
+import LocaleSwitcher from '@/components/LocaleSwitcher/LocaleSwitcher.vue'
+
+export default {
+  name: 'App',
+  components: {
+    LocaleSwitcher
+  }
+}
+</script>
