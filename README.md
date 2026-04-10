@@ -3,22 +3,58 @@
 这是一个用于展示 **PreTeXt 使用方式、API 说明与示例实践** 的站点项目。
 本项目估摸着90%由AI构成
 
+## 技术栈与版本要求
+
+- **Node.js**: >= 16.0.0 (推荐 >= 18.0.0)
+- **npm**: >= 8.0.0 (推荐 >= 8.19.0)
+- **Vue**: 3.5.32
+- **Vite**: 8.0.4
+- **TypeScript**: ~6.0.2
+
+### 核心依赖
+- **PreTeXt**: @chenglou/pretext ^0.0.4
+- **Vue i18n**: ^10.0.7
+- **Vue Router**: ^4.6.4
+
+### 开发依赖
+- **Vue TSC**: ^3.2.6
+- **Vite Vue Plugin**: ^6.0.5
+- **@types/node**: ^24.12.2
+
 ## 你可以在这里看到什么
 - 产品化首页：解释 PreTeXt 的定位与价值。
 - 文档页：按 **安装 / 快速开始 / API / 示例** 组织。
 - 示例页：基础、高级与创意 Playground。
 - 高级 Playground：可视化调参，观察文本布局与交互行为。
 
-## 开发命令
+## 安装与开发
+
+### 安装依赖
 ```bash
 npm install
+```
+
+### 开发服务器
+```bash
 npm run dev
 ```
 
-类型检查：
+### 构建项目
+```bash
+npm run build
+```
+
+### 预览构建结果
+```bash
+npm run preview
+```
+
+### 类型检查
 ```bash
 npx vue-tsc -b
 ```
+
+## 开发命令
 
 ## 项目目录说明（当前）
 ```text
