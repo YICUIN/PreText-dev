@@ -1,11 +1,10 @@
-// 通用二维点，用于轨迹采样、碰撞检测和插值计算。
+// 基础二维点，用于轨迹采样、碰撞计算和位置插值。
 export type Point = {
   x: number;
   y: number;
 };
 
-// 龙身单段的运行时状态：
-// char 是该段显示字符，angle 决定段的朝向（用于旋转渲染）。
+// 龙身单段的运行时状态。
 export type DragonSegment = {
   x: number;
   y: number;
@@ -13,12 +12,11 @@ export type DragonSegment = {
   angle: number;
 };
 
-// 装饰物渲染结构：
-// 这里的每一项通常对应一个“字符饰品”的最终屏幕姿态。
+// 装饰字符的最终渲染数据。
 export type DragonDecoration = {
   id: string;
-  kind: 'wing' | 'limb' | 'horn';
-  side: 'left' | 'right';
+  kind: "wing" | "limb" | "horn";
+  side: "left" | "right";
   text: string;
   x: number;
   y: number;
@@ -33,8 +31,7 @@ export type DragonDecoration = {
   color: string;
 };
 
-// 文本字符物理状态：
-// original* 表示静态目标位，current*/velocity* 用于动态位移模拟。
+// 文本字符的物理与颜色状态。
 export type TextCharState = {
   originalX: number;
   originalY: number;
@@ -43,4 +40,10 @@ export type TextCharState = {
   velocityX: number;
   velocityY: number;
   isColliding: boolean;
+  colorBaseHue: number;
+  currentHue: number;
+  targetHue: number;
+  colorStrength: number;
+  targetColorStrength: number;
+  colorVelocity: number;
 };
