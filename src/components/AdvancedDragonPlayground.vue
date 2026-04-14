@@ -27,6 +27,9 @@
       v-model:ornament-sway-amplitude="ornamentSwayAmplitude"
       v-model:ornament-sway-speed="ornamentSwaySpeed"
       v-model:custom-text="customText"
+      v-model:text-font-size="textFontSize"
+      v-model:text-max-width="textMaxWidth"
+      v-model:text-line-height="textLineHeight"
       v-model:auto-move-enabled="autoMoveEnabled"
       v-model:auto-move-speed="autoMoveSpeed" />
 
@@ -68,7 +71,7 @@
       </div>
 
       <div
-        v-for="(segment, index) in dragonSegments"
+        v-for="(segment, index) in visibleDragonSegments"
         :key="index"
         class="dragon-segment"
         :style="{
@@ -78,15 +81,23 @@
         }">
         {{ segment.char }}
       </div>
+
+      <DragonBurrowPortal
+        :x="emergenceOrigin.x"
+        :y="emergenceOrigin.y"
+        :is-active="dragonSegments.length > 0"
+        :has-fully-emerged="hasFullyEmerged" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
 
 import AdvancedDragonControls from "./advanced-dragon-playground/AdvancedDragonControlsPanel.vue";
-import { useDragonDecorations } from "./advanced-dragon-playground/useDragonDecorations";
+import DragonBurrowPortal from "./advanced-dragon-playground/DragonBurrowPortal.vue";
+import { useDragonDecorationsVisible } from "./advanced-dragon-playground/useDragonDecorationsVisible";
 import { useDragonMotion } from "./advanced-dragon-playground/useDragonMotion";
 import { useTextCharPhysics } from "./advanced-dragon-playground/useTextCharPhysics";
 
@@ -125,12 +136,25 @@ const ornamentSwaySpeed = ref(3.8);
 const autoMoveEnabled = ref(true);
 const autoMoveSpeed = ref(25);
 
-// 被龙身挤开的普通文本内容。按换行拆成多行渲染。
+// 被龙身挤开的普通文本内容。
+// 它不再直接按 "\n" 手工拆行，而是先经过 PreTeXt 计算出逐行布局，
+// 再把布局结果交给模板和碰撞系统消费。
 const customText = ref(`这是一段会被龙形文本挤开的文本。
 当龙在文本间穿行时，字符会像沙子一样贴着龙身。
 你可以在这里自由编辑内容，每一行都会单独排列。
 停下后文本会尽量回位，但仍会被龙身稳定支撑。`);
-const displayTexts = computed(() => customText.value.split("\n"));
+// 这三个参数直接参与 PreTeXt 的正文排版：
+// - textFontSize: 字号
+// - textMaxWidth: 正文可用排版宽度
+// - textLineHeight: 行高
+// 这样控制面板改动时，看到的是排版结果变化，而不只是视觉样式变化。
+const textFontSize = ref(16);
+const textMaxWidth = ref(760);
+const textLineHeight = ref(1.5);
+const displayTexts = ref<string[][]>([]);
+// textLayoutVersion 用来显式标记“正文静态布局已经更新”。
+// watcher 不直接盯着 displayTexts 深层结构，而是只关心这个版本号即可。
+const textLayoutVersion = ref(0);
 
 const repulsionForce = ref(75);
 const recoverySpeed = ref(0.005);
@@ -144,6 +168,9 @@ const animationClock = ref(0);
 const {
   dragonSegments,
   velocity,
+  revealedSegmentCount,
+  hasFullyEmerged,
+  emergenceOrigin,
   initializeDragon,
   updateDragon,
   handleMouseMove,
@@ -158,18 +185,28 @@ const {
   autoMoveSpeed,
 });
 
+// 可见龙身是“完整运动结果”的一个前缀切片。
+// 首轮出洞完成前，只把已经解锁的前几节交给渲染层和碰撞层；
+// 完全显现后，整条龙永久保持可见。
+const visibleDragonSegments = computed(() => {
+  if (hasFullyEmerged.value) {
+    return dragonSegments.value;
+  }
+
+  return dragonSegments.value.slice(0, revealedSegmentCount.value);
+});
+
 // useTextCharPhysics 输出字符 ref 管理、碰撞检测和样式写回能力。
 // 它只依赖“当前龙段位 + 当前速度”，和主运动系统保持单向依赖。
 const {
   initializeTextCharStates,
   setTextCharRef,
   resetTextCharRefs,
-  syncTextCharLayouts,
   checkCollisions,
   updateTextCharPositions,
 } = useTextCharPhysics({
   container,
-  dragonSegments,
+  dragonSegments: visibleDragonSegments,
   velocity,
   repulsionForce,
   recoverySpeed,
@@ -177,30 +214,63 @@ const {
   colorReturnSpeed,
 });
 
-// 装饰层只消费 dragonSegments 和装饰配置，不碰文本物理与输入系统。
-const dragonDecorations = useDragonDecorations(dragonSegments, animationClock, {
-  showDragonWings,
-  showDragonLimbs,
-  showDragonHorns,
-  wingDecorationText,
-  limbDecorationText,
-  hornDecorationText,
-  wingOpenAngle,
-  limbOpenAngle,
-  hornOpenAngle,
-  wingDecorationSize,
-  limbDecorationSize,
-  hornDecorationSize,
-  wingDecorationSpacing,
-  limbDecorationSpacing,
-  hornDecorationSpacing,
-  wingFlapAmplitude,
-  wingFlapSpeed,
-  ornamentSwayAmplitude,
-  ornamentSwaySpeed,
-});
+// 装饰层消费完整龙身轨迹，但会结合显现进度控制哪些装饰可以出现。
+const dragonDecorations = useDragonDecorationsVisible(
+  dragonSegments,
+  revealedSegmentCount,
+  hasFullyEmerged,
+  animationClock,
+  {
+    showDragonWings,
+    showDragonLimbs,
+    showDragonHorns,
+    wingDecorationText,
+    limbDecorationText,
+    hornDecorationText,
+    wingOpenAngle,
+    limbOpenAngle,
+    hornOpenAngle,
+    wingDecorationSize,
+    limbDecorationSize,
+    hornDecorationSize,
+    wingDecorationSpacing,
+    limbDecorationSpacing,
+    hornDecorationSpacing,
+    wingFlapAmplitude,
+    wingFlapSpeed,
+    ornamentSwayAmplitude,
+    ornamentSwaySpeed,
+  }
+);
 
 let animationId: number | null = null;
+
+// 根据当前正文内容和容器宽度计算 PreTeXt 布局。
+// 这里是正文“原始文本 -> 逐行显示结果”的唯一入口。
+const computePretextLayout = () => {
+  if (!container.value) {
+    displayTexts.value = customText.value.split("\n").map((line) => Array.from(line));
+    textLayoutVersion.value += 1;
+    return;
+  }
+
+  const textFont = `${textFontSize.value}px Arial`;
+  const availableWidth = Math.max(80, Math.min(textMaxWidth.value, container.value.clientWidth - 40));
+
+  try {
+    const prepared = prepareWithSegments(customText.value, textFont);
+    const layoutResult = layoutWithLines(prepared, availableWidth, textLineHeight.value);
+
+    // 模板层仍然按“行 -> 字符”渲染，只是字符来源改成了 PreTeXt 的换行结果。
+    displayTexts.value = layoutResult.lines.map((line) => Array.from(line.text));
+  } catch (error) {
+    console.error("PreTeXt 正文布局错误:", error);
+    displayTexts.value = customText.value.split("\n").map((line) => Array.from(line));
+  }
+
+  textLayoutVersion.value += 1;
+};
+
 // 全局动画顺序固定为：
 // 更新时间 -> 更新龙身运动 -> 计算文本碰撞 -> 写回文本样式。
 // 这个顺序保证文本看到的是“最新位置的龙”。
@@ -212,9 +282,22 @@ const animate = () => {
   animationId = requestAnimationFrame(animate);
 };
 
-// 文本结构变化时，字符节点会重建。
-// 这里先清空旧引用，再等下一轮 DOM 渲染后重新建立字符状态。
-watch(customText, async () => {
+// 文本输入变化时，先用 PreTeXt 重新排版正文。
+// 真正的字符节点重建交给下面监听 textLayoutVersion 的 watcher 统一处理。
+watch(customText, () => {
+  computePretextLayout();
+});
+
+// 正文字号、宽度和行高都直接影响 PreTeXt 的换行结果，
+// 因此这些参数变化时也要重跑正文布局。
+watch([textFontSize, textMaxWidth, textLineHeight], () => {
+  computePretextLayout();
+});
+
+// 正文静态布局变化后，字符节点会整体重建。
+// 这里先清空旧引用，再等下一轮 DOM 渲染完成后重新建立字符状态，
+// 这样文本物理层拿到的就是最新的 PreTeXt 布局位置。
+watch(textLayoutVersion, async () => {
   resetTextCharRefs();
   await initializeTextCharStates();
 });
@@ -225,20 +308,19 @@ watch(dragonTextContent, () => {
 });
 
 // 首次挂载时先建龙，再建字符状态，再开始动画。
-// resize 时只重算文本布局缓存，不需要重建字符状态。
+// resize 时正文可用宽度会变化，所以需要重新跑一次 PreTeXt 布局。
 onMounted(async () => {
   initializeDragon();
-  await initializeTextCharStates();
-  syncTextCharLayouts();
+  computePretextLayout();
   animate();
-  window.addEventListener("resize", syncTextCharLayouts);
+  window.addEventListener("resize", computePretextLayout);
 });
 
 onUnmounted(() => {
   if (animationId) {
     cancelAnimationFrame(animationId);
   }
-  window.removeEventListener("resize", syncTextCharLayouts);
+  window.removeEventListener("resize", computePretextLayout);
 });
 </script>
 
@@ -270,8 +352,9 @@ h2 {
 .text-container {
   padding: 20px;
   line-height: 1.5;
-  font-size: 16px;
+  font: 16px Arial;
   color: #333;
+  user-select: none;
 }
 
 .text-line {

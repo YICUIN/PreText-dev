@@ -61,8 +61,8 @@ export const useTextCharPhysics = ({
   // - colorFade*: 颜色开始快速收尾的阈值
   const damping = ref(0.9);
   const collisionSpeedThreshold = 0.2;
-  const collisionRadius = 25;
-  const collisionHoldRadius = 40;
+  const collisionRadius = 16;
+  const collisionHoldRadius = 16;
   const staticPushStrength = 1;
   const collisionSettling = 0.7;
   const collisionStaticVelocityThreshold = 0.08;

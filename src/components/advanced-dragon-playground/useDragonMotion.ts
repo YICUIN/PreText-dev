@@ -41,6 +41,7 @@ export const useDragonMotion = ({
   const targetPosition = reactive({ x: 100, y: 100 });
   const mouseMoving = ref(false);
   const mouseStopTime = ref(0);
+  const emergenceOrigin = reactive({ x: 100, y: 100 });
   // dragonDirection 始终表示当前运动方向，用于头部朝向和自动巡航。
   const dragonDirection = reactive({ x: 1, y: 0 });
 
@@ -56,6 +57,11 @@ export const useDragonMotion = ({
   const velocity = reactive({ x: 0, y: 0 });
   const isBouncing = ref(false);
   const currentSwingAmplitude = ref(5);
+  // 首次出洞阶段：一开始只显示头部。
+  // 随着累计移动距离增加，逐段解锁龙身；一旦全部露出，就永久保持可见。
+  const revealedSegmentCount = ref(1);
+  const hasFullyEmerged = ref(false);
+  const emergedTravelDistance = ref(0);
 
   const bounceDamping = 0.85;
   const trailPointSpacing = 4;
@@ -74,6 +80,29 @@ export const useDragonMotion = ({
   // 轨迹实际保留的最大弧长略大于整条龙身长度，给尾部和摆动留出余量。
   const getMaxTrailLength = (segmentCount: number) => {
     return Math.max(1, segmentCount - 1) * segmentDistance + trailPointSpacing * 6;
+  };
+
+  // 根据头部累计移动距离，推进“从洞里钻出来”的显现进度。
+  // 每累计一个 segmentDistance，就多露出一节身体。
+  const updateEmergenceProgress = (movedDistance: number) => {
+    if (hasFullyEmerged.value || dragonSegments.value.length === 0 || movedDistance <= 0) {
+      return;
+    }
+
+    emergedTravelDistance.value += movedDistance;
+    const nextVisibleCount = Math.min(
+      dragonSegments.value.length,
+      1 + Math.floor(emergedTravelDistance.value / segmentDistance),
+    );
+
+    if (nextVisibleCount !== revealedSegmentCount.value) {
+      revealedSegmentCount.value = nextVisibleCount;
+    }
+
+    if (revealedSegmentCount.value >= dragonSegments.value.length) {
+      hasFullyEmerged.value = true;
+      revealedSegmentCount.value = dragonSegments.value.length;
+    }
   };
 
   // 裁剪头部历史轨迹。
@@ -243,6 +272,8 @@ export const useDragonMotion = ({
 
     mousePosition.x = startPoint.x;
     mousePosition.y = startPoint.y;
+    emergenceOrigin.x = startPoint.x;
+    emergenceOrigin.y = startPoint.y;
     targetPosition.x = startPoint.x;
     targetPosition.y = startPoint.y;
     mouseMoving.value = false;
@@ -254,6 +285,9 @@ export const useDragonMotion = ({
     velocity.y = 0;
     autoMoveActive.value = false;
     isBouncing.value = false;
+    revealedSegmentCount.value = chars.length > 0 ? 1 : 0;
+    hasFullyEmerged.value = chars.length <= 1;
+    emergedTravelDistance.value = 0;
 
     syncDragonSegmentsWithTrail();
   };
@@ -400,6 +434,7 @@ export const useDragonMotion = ({
       dragonDirection.x = velocity.x / movedDistance;
       dragonDirection.y = velocity.y / movedDistance;
     }
+    updateEmergenceProgress(movedDistance);
 
     if (isBouncing.value && currentSwingAmplitude.value > 20) {
       const now = Date.now();
@@ -476,6 +511,9 @@ export const useDragonMotion = ({
   return {
     dragonSegments,
     velocity,
+    revealedSegmentCount,
+    hasFullyEmerged,
+    emergenceOrigin,
     initializeDragon,
     updateDragon,
     handleMouseMove,
