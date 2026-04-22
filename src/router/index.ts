@@ -18,7 +18,7 @@ const routes = [
   {
     path: '/examples/basic',
     name: 'BasicExample',
-    component: () => import('../views/BasicExample.vue')
+    component: () => import('../views/BasicMeasurementExample.vue')
   },
   {
     path: '/examples/advanced',
