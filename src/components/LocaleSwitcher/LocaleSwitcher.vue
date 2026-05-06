@@ -98,12 +98,16 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   z-index: 1000;
   margin-top: 2px;
+  /* 补充最低宽度，防止下拉菜单宽度被挤压，变成两行 */
+  min-width: 120px;
 }
 
 .dropdown-item {
   padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.3s;
+  /* 防止下拉菜单宽度被挤压，变成两行 */
+  white-space: nowrap;
 }
 
 .dropdown-item:hover {
